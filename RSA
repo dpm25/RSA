@@ -1,0 +1,124 @@
+import java.io.File;
+import java.math.BigInteger;
+import java.util.Random;
+
+public class RSA {
+
+    private static String filename;
+
+    private static void KeyGen() {
+        StdOut.print("Enter number of prime bits: ");
+        int primeBits = StdIn.readInt();
+
+        Random rnd = new Random();
+        // get two distinct primes of size primeBits
+        BigInteger p = new BigInteger(primeBits, 128, rnd);
+        BigInteger q;
+        do {
+            q = new BigInteger(primeBits, 128, rnd);
+        } while (p.compareTo(q) == 0);
+        // compute the modulus
+        BigInteger n = p.multiply(q);
+
+        // compute m = phi(n)
+        BigInteger pMinus1 = p.subtract(BigInteger.valueOf(1));
+        BigInteger qMinus1 = q.subtract(BigInteger.valueOf(1));
+        BigInteger phi = pMinus1.multiply(qMinus1);
+
+        // get e relatively prime to m
+        BigInteger e = BigInteger.valueOf(3);
+        while (e.gcd(phi).compareTo(BigInteger.valueOf(1)) > 0) {
+            e = e.add(BigInteger.valueOf(2));
+        }
+
+        // compute d the decryption exponent
+        BigInteger[] vals = XGCD(e, phi);
+        BigInteger d = vals[1].add(phi);
+
+        writeToFile("public.txt", n, e);
+        writeToFile("private.txt", n, d);
+        StdOut.printf("n = %s\nphi = %s\ne = %s\nd = %s\n", n, phi, e, d);
+    }
+
+    private static void writeToFile(String filename, BigInteger a, BigInteger b) {
+        
+        Out out = new Out(filename);
+        out.println(a);
+        out.println(b);
+        out.close();
+    }
+
+    private static BigInteger[] readFromFile(String filename) {
+        BigInteger[] a = new BigInteger[2];
+        In in = new In(new File(filename));
+        a[0] = new BigInteger(in.readLine());
+        a[1] = new BigInteger(in.readLine());
+        in.close();
+        return a;
+    }
+
+    private static BigInteger[] XGCD(BigInteger a, BigInteger b) {
+        if (BigInteger.ZERO.equals(b)) {
+            return new BigInteger[]{a, BigInteger.ONE, BigInteger.ZERO};
+        } else {
+            BigInteger[] values = XGCD(b, a.mod(b));
+            BigInteger dPrime = values[0];
+            BigInteger sPrime = values[1];
+            BigInteger tPrime = values[2];
+            BigInteger pDividedQ = a.divide(b);
+            return new BigInteger[]{dPrime, tPrime, sPrime.subtract(pDividedQ.multiply(tPrime))};
+        }
+    }
+
+    private static void Encode() {
+        BigInteger[] vals = readFromFile("public.txt");
+        BigInteger n = vals[0];
+        BigInteger e = vals[1];
+
+        In in = new In(new File(filename));
+        Out out = new Out(filename + ".enc");
+        while (in.hasNextChar()) {
+            char c = in.readChar();
+            BigInteger m = BigInteger.valueOf((long) c);
+            out.print(m.modPow(e, n));
+            out.print(' ');
+        }
+        in.close();
+        out.close();
+    }
+
+    private static void Decode() {
+        BigInteger[] vals = readFromFile("private.txt");
+        BigInteger n = vals[0];
+        BigInteger d = vals[1];
+
+        In in = new In(new File(filename));
+        Out out = new Out(filename.replaceAll(".enc", ".cop"));
+        while (!in.isEmpty()) {
+            BigInteger m = new BigInteger(in.readString());
+            out.print((char) m.modPow(d, n).intValue());
+        }
+        in.close();
+        out.close();
+    }
+
+    
+    public static void main(String[] args) {
+        if (args == null || args.length == 0) {
+            KeyGen();
+        } else {
+            String flag = args[0];
+            filename = args[1];
+            if (flag.equals("-encrypt")) {
+                //StdOut.println("TEST");
+                Encode();
+            } else if (flag.equals("-decrypt")) {
+                //StdOut.print("TEST");
+                Decode();
+            } else {
+                StdOut.println("Unknown switch " + flag);
+            }
+        }
+    }
+
+}
